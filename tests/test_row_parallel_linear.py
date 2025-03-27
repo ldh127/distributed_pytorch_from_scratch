@@ -1,6 +1,7 @@
 import os
 import math
 import unittest
+import argparse
 from argparse import ArgumentParser
 
 import tqdm
@@ -139,7 +140,7 @@ class TestRowParallelLinear(unittest.TestCase):
         # check 3: the loss histories should be all the same for both parallel and non-parallel cases
         self.assertTrue(torch.allclose(vallina_loss_history, para_loss_history))
 
-    def train(self, model, idim, n_steps, tag):
+    def train(self, model: nn.Module, idim: int, n_steps: int, tag: str) -> nn.Module:
         loss_history = []
         self.initialize_random_states()
         optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
@@ -165,7 +166,7 @@ def get_args():
     return parser.parse_args()
 
 
-def run_test(rank, args):
+def run_test(rank: int, args: argparse.Namespace):
     os.environ['MASTER_ADDR'] = args.master_addr
     os.environ['MASTER_PORT'] = args.master_port
     torch.cuda.set_device(rank)

@@ -40,5 +40,5 @@ class Reduce(torch.autograd.Function):
         return input
 
     @staticmethod
-    def backward(ctx, grad_output):
+    def backward(ctx, grad_output: torch.Tensor) -> torch.Tensor:
         return grad_output
