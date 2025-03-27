@@ -42,3 +42,42 @@ class Reduce(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor) -> torch.Tensor:
         return grad_output
+
+
+class Copy(torch.autograd.Function):
+    # forward: directly return the input
+    # backward: reduce the grad_output
+    # Notes: Copy is the opposite operation of Reduce
+    @staticmethod
+    def forward(ctx, input: torch.Tensor) -> torch.Tensor:
+        return input
+    
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor) -> torch.Tensor:
+        if pm.pgm.tp_size == 1:
+            return grad_output
+        dist.all_reduce(grad_output, op=dist.ReduceOp.SUM, group=pm.pgm.tp_group)
+        return grad_output
+    
+
+class Gather(torch.autograd.Function):
+    # forward: gather the input along the last dimension: (..., idim/n) -> (..., idim)
+    # backward: split the upstream grad_output along the last dim: (..., idim) -> (..., idim/n)
+    # Notes: Gather is the opposite operation of Split
+
+    @staticmethod
+    def forward(ctx, input: torch.Tensor) -> torch.Tensor:
+        if pm.pgm.tp_size == 1:
+            return input
+        input_list = [input.new_zeros(input.size()) for _ in range(pm.pgm.tp_size)]
+        input_list[pm.pgm.tp_rank] = input
+        dist.all_gather(input_list, input, group=pm.pgm.tp_group)
+        return torch.cat(input_list, dim=-1).contiguous()
+    
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor) -> torch.Tensor:
+        if pm.pgm.tp_size == 1:
+            return grad_output
+        assert grad_output.size(-1) % pm.pgm.tp_size == 0
+        grad_arr = torch.split(grad_output, grad_output.size(-1) // pm.pgm.tp_size, dim=-1)
+        return grad_arr[pm.pgm.tp_rank].contiguous()
