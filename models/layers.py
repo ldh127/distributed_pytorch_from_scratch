@@ -20,7 +20,6 @@ class RowParallelLinear(nn.Module):
         super().__init__()
         self.idim, self.odim = idim, odim
         self.split_input = split_input
-
         assert idim % pm.pgm.tp_size == 0
         self.idim_partition = self.idim // pm.pgm.tp_size
         self.weight = nn.Parameter(torch.Tensor(self.odim, self.idim_partition))
@@ -38,12 +37,9 @@ class RowParallelLinear(nn.Module):
         nn.init.normal_(weight, -bound, bound)
         if pm.pgm.tp_size > 1:
             dist.broadcast(weight, src=0)       # broadcast weight to all processes to ensure weight consistency
-            weight_list = torch.split(weight, self.idim_partition, dim=-1)   # (odim, idim) -> [(odim, idim/n), ...]
-            with torch.no_grad():
-                self.weight.copy_(weight_list[pm.pgm.tp_rank].contiguous())
-        else:
-            with torch.no_grad():
-                self.weight.copy_(weight.contiguous())
+            weight = torch.split(weight, self.idim_partition, dim=-1)[pm.pgm.tp_rank]   # (odim, idim) -> [(odim, idim/n), ...]
+        with torch.no_grad():
+            self.weight.copy_(weight.contiguous())
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Step 1 (optional): split the input tensor along the last dim, i.e. (..., idim) -> (..., idim/n)
