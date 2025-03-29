@@ -134,3 +134,14 @@ class ParallelVocabularyEmbedding(nn.Module):
         out = F.embedding(x, self.weight)
         out[~m] = 0.                # will be gathered from other TP devices
         return Reduce.apply(out)    # gather from all TP devices
+
+
+class RMSNorm(nn.Module):
+    def __init__(self, hdim, eps=1e-5):
+        super().__init__()
+        self.hdim = hdim
+        self.eps = eps
+        self.scale = nn.Parameter(torch.ones(hdim))
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.scale * x / (x.pow(2).mean(-1) + self.eps).sqrt()
