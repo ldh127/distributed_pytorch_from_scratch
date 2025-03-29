@@ -136,12 +136,15 @@ class ParallelVocabularyEmbedding(nn.Module):
         return Reduce.apply(out)    # gather from all TP devices
 
 
+# Borrowed from LLama: https://github.com/meta-llama/llama/blob/main/llama/model.py
 class RMSNorm(nn.Module):
-    def __init__(self, hdim, eps=1e-5):
+    def __init__(self, hdim: int, eps: float = 1e-5):
         super().__init__()
-        self.hdim = hdim
         self.eps = eps
         self.scale = nn.Parameter(torch.ones(hdim))
     
+    def _norm(self, x: torch.Tensor) -> torch.Tensor:
+        return x * (x.pow(2).mean(-1, keepdim=True) + self.eps).rsqrt()
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.scale * x / (x.pow(2).mean(-1) + self.eps).sqrt()
+        return self.scale * self._norm(x.float()).type_as(x)
