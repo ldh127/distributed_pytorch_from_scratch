@@ -1,4 +1,5 @@
 import math
+from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -98,3 +99,38 @@ class ColumnParallelLinear(nn.Module):
         # Step 4: gather linear outputs, i.e. [(.., odim/n), ...] -> (..., odim)
         x = Gather.apply(x)
         return x
+
+
+class ParallelVocabularyEmbedding(nn.Module):
+    def __init__(self, vocab_size: int, hdim: int):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.hdim = hdim
+        self.vocab_st_idx, self.vocab_ed_idx = self._get_vocab_range(vocab_size)
+        self.weight = nn.Parameter(torch.Tensor(self.vocab_ed_idx - self.vocab_st_idx, self.hdim))
+
+    def reset_parameters(self):
+        weight = torch.empty(self.vocab_size, self.hdim, device=self.weight.device, dtype=self.weight.dtype, requires_grad=False)
+        nn.init.normal_(weight, mean=0., std=1.)
+        if pm.pgm.tp_size > 1:
+            dist.broadcast(weight, src=0)
+            weight = torch.split(weight, self.vocab_size // pm.pgm.tp_size)[pm.pgm.tp_rank]
+        with torch.no_grad():
+            self.weight.copy_(weight.contiguous())
+
+    def _get_vocab_range(self, vocab_size: int) -> Tuple[int, int]:
+        tp_size, tp_rank = pm.pgm.tp_size, pm.pgm.tp_rank
+        assert tp_size < vocab_size and vocab_size % tp_size == 0
+        n_vocab_per_partition = vocab_size // tp_size
+        st_idx = n_vocab_per_partition * tp_rank
+        ed_idx = st_idx + n_vocab_per_partition
+        return st_idx, ed_idx
+
+    def forward(self, x: torch.Tensor):
+        # x: (B, L)
+        assert x.ndim == 2, f"Input should be 2D tensor (B, L), but got {x.ndim}D tensor."
+        m = torch.logical_and(self.vocab_st_idx <= x, x < self.vocab_ed_idx)
+        x[m], x[~m] = x[m] - self.vocab_st_idx, 0
+        out = F.embedding(x, self.weight)
+        out[~m] = 0.                # will be gathered from other TP devices
+        return Reduce.apply(out)    # gather from all TP devices
