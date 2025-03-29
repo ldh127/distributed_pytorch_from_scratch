@@ -83,12 +83,9 @@ class ColumnParallelLinear(nn.Module):
         nn.init.normal_(weight, -bound, bound)
         if pm.pgm.tp_size > 1:
             dist.broadcast(weight, src=0)       # broadcast weight to all processes to ensure weight consistency
-            weight_list = torch.split(weight, self.odim_partition, dim=0)   # (odim, idim) -> [(odim/n, idim), ...]
-            with torch.no_grad():
-                self.weight.copy_(weight_list[pm.pgm.tp_rank].contiguous())
-        else:
-            with torch.no_grad():
-                self.weight.copy_(weight.contiguous())
+            weight = torch.split(weight, self.odim_partition, dim=0)[pm.pgm.tp_rank]   # (odim, idim) -> [(odim/n, idim), ...]
+        with torch.no_grad():
+            self.weight.copy_(weight.contiguous())
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Step 1: copy (this is for backward correctness)
