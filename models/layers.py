@@ -97,7 +97,8 @@ class ColumnParallelLinear(nn.Module):
         if self.add_bias:
             x = x + self.bias
         # Step 4: gather linear outputs, i.e. [(.., odim/n), ...] -> (..., odim)
-        x = Gather.apply(x)
+        if self.gather_output:
+            x = Gather.apply(x)
         return x
 
 
