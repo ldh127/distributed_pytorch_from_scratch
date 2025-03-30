@@ -35,6 +35,14 @@ class TestColumnParallelLinear(unittest.TestCase):
         self.test_one_pass()
         self.test_multiple_pass()
 
+    def _compare_model_weights(self, col_parallel_linear: ColumnParallelLinear, vallina_linear: nn.Linear):
+        odim_per_partition = col_parallel_linear.odim_partition
+        st_pos = pm.pgm.tp_rank * odim_per_partition
+        end_pos = (pm.pgm.tp_rank + 1) * odim_per_partition
+        self.assertTrue(torch.allclose(vallina_linear.weight.data[st_pos: end_pos], col_parallel_linear.weight.data))
+        if col_parallel_linear.add_bias:
+            self.assertTrue(torch.allclose(vallina_linear.bias.data[st_pos: end_pos], col_parallel_linear.bias.data))
+
     def test_one_pass(self):
         test_args = []
         for idim in (512, 1024, 2048):
@@ -72,9 +80,9 @@ class TestColumnParallelLinear(unittest.TestCase):
             for bs in (1, 8, 16):
                 for seq_len in (32, 64, 128, 256):
                     x = torch.rand(bs, seq_len, idim, requires_grad=True, device='cuda')
+                    x_clone = x.clone()
                     y_parallel = col_parallel_linear(x)
-                    loss = y_parallel.mean()
-                    loss.backward()
+                    y_parallel.mean().backward()
                     x_parallel_grad = x.grad.clone()
                     x.grad.zero_()
                     w_parallel_grad = col_parallel_linear.weight.grad.clone()
@@ -83,7 +91,7 @@ class TestColumnParallelLinear(unittest.TestCase):
                         b_parallel_grad = col_parallel_linear.bias.grad.clone()
                         col_parallel_linear.bias.grad.zero_()
                     
-                    y_vallina = vallina_linear(x)
+                    y_vallina = vallina_linear(x_clone)
                     y_vallina.mean().backward()
                     x_vallina_grad = x.grad.clone()
                     x.grad.zero_()
@@ -95,14 +103,17 @@ class TestColumnParallelLinear(unittest.TestCase):
 
                     # check 2: make sure the forward results are the same
                     self.assertEqual(y_parallel.shape, y_vallina.shape)
-                    # when atol=1e-6,the following check will not pass. Reason for this phenomenon is not investigated
+                    # when atol is more strict than 1e-4, the following assertion may fail.
+                    # This is likely due to the fact that linear may have different implementations of matrix multiplication for different sizes of input.
                     self.assertTrue(torch.allclose(y_parallel, y_vallina, atol=1e-4))
-                    
                     # check 3: make sure the backward results are the same
-                    self.assertTrue(torch.allclose(x_parallel_grad, x_vallina_grad, atol=1e-6))
-                    self.assertTrue(torch.allclose(w_parallel_grad, w_vallina_grad[st_pos: end_pos], atol=1e-6))
+                    self.assertTrue(torch.allclose(x_parallel_grad, x_vallina_grad))
+                    odim_per_partition = odim // pm.pgm.tp_size
+                    st_pos = pm.pgm.tp_rank * odim_per_partition
+                    end_pos = (pm.pgm.tp_rank + 1) * odim_per_partition
+                    self.assertTrue(torch.allclose(w_parallel_grad, w_vallina_grad[st_pos: end_pos]))
                     if add_bias:
-                        self.assertTrue(torch.allclose(b_parallel_grad, b_vallina_grad[st_pos: end_pos], atol=1e-6))
+                        self.assertTrue(torch.allclose(b_parallel_grad, b_vallina_grad[st_pos: end_pos]))
 
     def test_multiple_pass(self):
         idim, odim = 512, 1024
