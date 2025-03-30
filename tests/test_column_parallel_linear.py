@@ -49,7 +49,7 @@ class TestColumnParallelLinear(unittest.TestCase):
             for odim in (1024, 2048, 4096):
                 for add_bias in (True, False):
                     test_args.append((idim, odim, add_bias))
-      
+        
         for idim, odim, add_bias in tqdm.tqdm(test_args, desc="Test one-time forward and backward"):
             col_parallel_linear = ColumnParallelLinear(idim, odim, add_bias=add_bias, gather_output=True).cuda()
             self.initialize_random_states()
@@ -70,12 +70,7 @@ class TestColumnParallelLinear(unittest.TestCase):
                 vallina_linear.bias.retain_grad()
             
             # check 1: make sure the initial weight of col_parallel_linear is the same as vallina_linear
-            odim_per_partition = odim // pm.pgm.tp_size
-            st_pos = pm.pgm.tp_rank * odim_per_partition
-            end_pos = (pm.pgm.tp_rank + 1) * odim_per_partition
-            self.assertTrue(torch.allclose(vallina_linear.weight.data[st_pos: end_pos], col_parallel_linear.weight.data))
-            if add_bias:
-                self.assertTrue(torch.allclose(vallina_linear.bias.data[st_pos: end_pos], col_parallel_linear.bias.data))
+            self._compare_model_weights(col_parallel_linear, vallina_linear)
 
             for bs in (1, 8, 16):
                 for seq_len in (32, 64, 128, 256):
