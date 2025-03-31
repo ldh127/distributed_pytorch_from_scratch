@@ -18,6 +18,7 @@ from tensorboardX import SummaryWriter
 from models.model import Transformer, VallinaTransformer
 from dataset import get_dataloader
 from constants import IGNORE_INDEX
+from constants import ModelArgumments
 import process_manager as pm
 
 
@@ -64,16 +65,6 @@ def init_dist_env(args: Namespace, rank: int):
     dist.init_process_group(backend='nccl', init_method='env://', world_size=args.tp_size, rank=rank)
     pm.init_pgm(args.tp_size)
 
-
-@dataclass
-class ModelArgumments:
-    attn_dim: int = 512
-    ffn_dim: int = 2048
-    num_heads: int = 8
-    rope_theta: float = 10000.
-    num_layers: int =  12
-    vocab_size: int = 1024
-    maxlen: int = 2048
 
 
 def train(rank: int, args: Namespace):
