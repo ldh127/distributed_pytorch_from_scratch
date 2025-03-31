@@ -76,20 +76,24 @@ def train(rank: int, args: Namespace):
     model = model_cls(**asdict(model_args))
     model.cuda()
     model.reset_parameters()        # re-initialize parameters (neccassary for tensor-parallel Transformer)
+    model.train()
     
     dataloader = get_dataloader(
         args.data_path, args.tokenizer_path, 
         args.batch_size, IGNORE_INDEX, split='train', maxlen=model_args.maxlen, shuffle=True,
     )
     assert dataloader.dataset.vocab_size == model_args.vocab_size, "vocab size of dataset and model should be the same"
+    
+    dist.barrier()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.OneCycleLR(optimizer, args.lr, args.max_steps, pct_start=args.warmup_steps / args.max_steps)
     summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, f"tprank-{rank}"))
 
     tag = f"TP-{pm.pgm.tp_rank}" if not args.use_vallina_impl else "vanilla"
-    pbar = tqdm.tqdm(range(args.max_steps), desc=f"Training-[{tag}]", disable=rank != 0)
+    pbar = tqdm.tqdm(range(args.max_steps), desc=f"Training-[{tag}]", position=rank)
     accum_loss = 0.
     max_epoch = math.ceil(args.max_steps / len(dataloader))
+    
     dist.barrier()
     for epoch in range(max_epoch):
         for i, batch in enumerate(dataloader):
@@ -134,10 +138,13 @@ def train(rank: int, args: Namespace):
                         os.remove(ckpt)
                 dist.barrier()
             if pbar.n >= args.max_steps:
-                dist.barrier()
                 print(f"[TP rank {rank}]: Training finished (total steps: {pbar.n}). Exiting...")
                 break
+
     pbar.close()
+    summary_writer.close()
+    dist.barrier()
+    dist.destroy_process_group()
 
 
 if __name__ == '__main__':
