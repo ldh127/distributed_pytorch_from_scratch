@@ -4,9 +4,10 @@ from argparse import ArgumentParser
 
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
-from tokenizers.pre_tokenizers import Whitespace
+from tokenizers.pre_tokenizers import ByteLevel as ByteLevelPreTokenizer
 from tokenizers.trainers import BpeTrainer
-from tokenizers.decoders import ByteLevel
+from tokenizers.decoders import ByteLevel as ByteLevelDecoder
+from transformers import PreTrainedTokenizerFast
 
 from constants import BOS_TOKEN, EOS_TOKEN, UNK_TOKEN
 
@@ -32,8 +33,8 @@ if __name__ == "__main__":
     data_iterator = get_json_iterator(args.data_path, "train")
     special_tokens = [BOS_TOKEN, EOS_TOKEN, UNK_TOKEN]
     tokenizer = Tokenizer(BPE(unk_token=UNK_TOKEN))
-    tokenizer.pre_tokenizer = Whitespace()
-    tokenizer.decoder = ByteLevel()
+    tokenizer.pre_tokenizer = ByteLevelPreTokenizer()
+    tokenizer.decoder = ByteLevelDecoder()
     
     trainer = BpeTrainer(
         vocab_size=args.vocab_size,
@@ -51,3 +52,16 @@ if __name__ == "__main__":
     os.makedirs(os.path.dirname(args.output_path), exist_ok=True)
     tokenizer.save(args.output_path)
     print(f"Tokenizer saved to {args.output_path}")
+
+    tokenizer = PreTrainedTokenizerFast(tokenizer_file=args.output_path)
+    texts = [
+        "good morning",
+        "hello world",
+        "this is a test",
+        "this is another test",
+    ]
+    for t in texts:
+        ids = tokenizer(t)["input_ids"]
+        decoded_text = tokenizer.decode(ids, clean_up_tokenization_spaces=True)
+        decoded_text = decoded_text.strip()
+        assert t == decoded_text, f"'{t}' != '{decoded_text}'"
