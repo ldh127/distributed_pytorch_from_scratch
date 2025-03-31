@@ -27,20 +27,19 @@ class RowParallelLinear(nn.Module):
         self.add_bias = add_bias
         if add_bias:
             self.bias = nn.Parameter(torch.Tensor(self.odim))
-            with torch.no_grad():       # init with zero
-                self.bias.zero_()
         else:
             self.register_parameter("bias", None)
 
     def reset_parameters(self):
         weight = torch.empty(self.odim, self.idim, dtype=self.weight.dtype, device=self.weight.device, requires_grad=False)
-        bound = math.sqrt(2. / weight.size(1))
-        nn.init.normal_(weight, -bound, bound)
+        nn.init.kaiming_uniform_(weight, a=math.sqrt(5))    # the same as pytorch default
         if pm.pgm.tp_size > 1:
             dist.broadcast(weight, src=0)       # broadcast weight to all processes to ensure weight consistency
             weight = torch.split(weight, self.idim_partition, dim=-1)[pm.pgm.tp_rank]   # (odim, idim) -> [(odim, idim/n), ...]
         with torch.no_grad():
             self.weight.copy_(weight.contiguous())
+        if self.add_bias:
+            nn.init.zeros_(self.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Step 1 (optional): split the input tensor along the last dim, i.e. (..., idim) -> (..., idim/n)
@@ -73,20 +72,19 @@ class ColumnParallelLinear(nn.Module):
         self.add_bias = add_bias
         if add_bias:
             self.bias = nn.Parameter(torch.Tensor(self.odim_partition))
-            with torch.no_grad():       # init with zero
-                self.bias.zero_()
         else:
             self.register_parameter("bias", None)
 
     def reset_parameters(self):
         weight = torch.empty(self.odim, self.idim, dtype=self.weight.dtype, device=self.weight.device, requires_grad=False)
-        bound = math.sqrt(2. / weight.size(1))
-        nn.init.normal_(weight, -bound, bound)
+        nn.init.kaiming_uniform_(weight, a=math.sqrt(5))    # the same as pytorch default
         if pm.pgm.tp_size > 1:
             dist.broadcast(weight, src=0)       # broadcast weight to all processes to ensure weight consistency
             weight = torch.split(weight, self.odim_partition, dim=0)[pm.pgm.tp_rank]   # (odim, idim) -> [(odim/n, idim), ...]
         with torch.no_grad():
             self.weight.copy_(weight.contiguous())
+        if self.add_bias:
+            nn.init.zeros_(self.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Step 1: copy (this is for backward correctness)
@@ -112,7 +110,7 @@ class ParallelVocabularyEmbedding(nn.Module):
 
     def reset_parameters(self):
         weight = torch.empty(self.vocab_size, self.hdim, device=self.weight.device, dtype=self.weight.dtype, requires_grad=False)
-        nn.init.normal_(weight, mean=0., std=1.)
+        nn.init.normal_(weight, mean=0., std=1.)    # the same as pytorch default
         if pm.pgm.tp_size > 1:
             dist.broadcast(weight, src=0)
             weight = torch.split(weight, self.vocab_size // pm.pgm.tp_size)[pm.pgm.tp_rank]
