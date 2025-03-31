@@ -132,6 +132,7 @@ def train(rank: int, args: Namespace):
             if pbar.n >= args.max_steps:
                 print(f"[TP rank {rank}]: Training finished (total steps: {pbar.n}). Exiting...")
                 break
+        torch.cuda.empty_cache()
 
     pbar.close()
     summary_writer.close()
