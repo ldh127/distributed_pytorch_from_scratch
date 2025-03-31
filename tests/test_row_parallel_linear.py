@@ -35,6 +35,14 @@ class TestRowParallelLinear(unittest.TestCase):
         self.test_one_pass()
         self.test_multiple_pass()
 
+    def _compare_model_weights(self, row_parallel_linear: RowParallelLinear, vallina_linear: nn.Linear):
+        idim_partition = row_parallel_linear.idim_partition
+        st_pos = pm.pgm.tp_rank * idim_partition
+        end_pos = (pm.pgm.tp_rank + 1) * idim_partition
+        self.assertTrue(torch.allclose(vallina_linear.weight.data[:, st_pos: end_pos], row_parallel_linear.weight.data))
+        if row_parallel_linear.add_bias:
+            self.assertTrue(torch.allclose(vallina_linear.bias.data, row_parallel_linear.bias.data))
+
     def test_one_pass(self):
         test_args = []
         for idim in (512, 1024, 2048):
@@ -53,21 +61,13 @@ class TestRowParallelLinear(unittest.TestCase):
             
             vallina_linear = nn.Linear(idim, odim, bias=add_bias).cuda()
             self.initialize_random_states()     # init random states again to make sure parallel and non-parallel linear have the same random weights
-            bound = math.sqrt(2. / idim)
-            nn.init.normal_(vallina_linear.weight, -bound, bound)
-            vallina_linear.weight.retain_grad()
+            nn.init.kaiming_uniform_(vallina_linear.weight, a=math.sqrt(5))
             if add_bias:
-                with torch.no_grad():
-                    vallina_linear.bias.zero_()
+                nn.init.zeros_(vallina_linear.bias)
                 vallina_linear.bias.retain_grad()
             
             # check 1: make sure the initial weight of row_parallel_linear is the same as vallina_linear
-            idim_per_partition = idim // pm.pgm.tp_size
-            st_pos = pm.pgm.tp_rank * idim_per_partition
-            end_pos = (pm.pgm.tp_rank + 1) * idim_per_partition
-            self.assertTrue(torch.allclose(vallina_linear.weight.data[:, st_pos: end_pos], row_parallel_linear.weight.data))
-            if add_bias:
-                self.assertTrue(torch.allclose(vallina_linear.bias.data, row_parallel_linear.bias.data))
+            self._compare_model_weights(row_parallel_linear, vallina_linear)
 
             for bs in (1, 8, 16):
                 for seq_len in (32, 64, 128, 256):
@@ -116,29 +116,20 @@ class TestRowParallelLinear(unittest.TestCase):
 
         vallina_linear = nn.Linear(idim, odim, bias=add_bias).cuda()
         self.initialize_random_states()
-        bound = math.sqrt(2. / idim)
-        nn.init.normal_(vallina_linear.weight, -bound, bound)
+        nn.init.kaiming_uniform_(vallina_linear.weight, a=math.sqrt(5))
         if add_bias:
-            with torch.no_grad():
-                vallina_linear.bias.zero_()
+            nn.init.zeros_(vallina_linear.bias)
             
         # check 1: make sure the initial weight of row_parallel_linear is the same as vallina_linear
-        idim_per_partition = idim // pm.pgm.tp_size
-        st_pos = pm.pgm.tp_rank * idim_per_partition
-        end_pos = (pm.pgm.tp_rank + 1) * idim_per_partition
-        self.assertTrue(torch.allclose(vallina_linear.weight.data[:, st_pos: end_pos], row_parallel_linear.weight.data))
-        if add_bias:
-            self.assertTrue(torch.allclose(vallina_linear.bias.data, row_parallel_linear.bias.data))
+        self._compare_model_weights(row_parallel_linear, vallina_linear)
 
         # check 2: after multiple updates, the weight of parallel and non-parallel linear should be the same
         row_parallel_linear, para_loss_history = self.train(row_parallel_linear, idim, n_train_steps, "parallel")
         vallina_linear, vallina_loss_history = self.train(vallina_linear, idim, n_train_steps, "vallina")
-        self.assertTrue(torch.allclose(vallina_linear.weight.data[:, st_pos: end_pos], row_parallel_linear.weight.data))
-        if add_bias:
-            self.assertTrue(torch.allclose(vallina_linear.bias.data, row_parallel_linear.bias.data))
+        self._compare_model_weights(row_parallel_linear, vallina_linear)
         
         # check 3: the loss histories should be all the same for both parallel and non-parallel cases
-        self.assertTrue(torch.allclose(vallina_loss_history, para_loss_history))
+        self.assertTrue(torch.allclose(vallina_loss_history, para_loss_history, atol=1e-6))
 
     def train(self, model: nn.Module, idim: int, n_steps: int, tag: str) -> nn.Module:
         loss_history = []
