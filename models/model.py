@@ -127,6 +127,7 @@ class Transformer(nn.Module):
             num_layers: int, vocab_size: int, maxlen: int = 2048, rope_theta: float = 10000.,
     ):
         super().__init__()
+        self.vocab_size = vocab_size
         self.embedding = ParallelVocabularyEmbedding(vocab_size, attn_dim)
         self.layers = nn.ModuleList([
             DecoderLayer(attn_dim, ffn_dim, num_heads, maxlen, rope_theta)
