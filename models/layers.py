@@ -143,7 +143,7 @@ class ParallelVocabularyEmbedding(nn.Module):
         return Reduce.apply(out)    # gather from all TP devices
 
 
-# Borrowed from LLama: https://github.com/meta-llama/llama/blob/main/llama/model.py
+# Borrowed from LLama: https://github.com/meta-llama/llama/blob/main/llama/model.py#L34C1-L77
 class RMSNorm(nn.Module):
     def __init__(self, hdim: int, eps: float = 1e-5):
         super().__init__()
