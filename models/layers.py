@@ -121,10 +121,16 @@ class ParallelVocabularyEmbedding(nn.Module):
 
     def _get_vocab_range(self, vocab_size: int) -> Tuple[int, int]:
         tp_size, tp_rank = pm.pgm.tp_size, pm.pgm.tp_rank
-        assert tp_size < vocab_size and vocab_size % tp_size == 0
+        assert tp_size < vocab_size
         n_vocab_per_partition = vocab_size // tp_size
         st_idx = n_vocab_per_partition * tp_rank
         ed_idx = st_idx + n_vocab_per_partition
+        if pm.pgm.tp_rank == pm.pgm.tp_size - 1 and ed_idx != vocab_size:
+            print(
+                f"[WARNING]: In ParallelVocabularyEmbedding, the vocab size {vocab_size} is not divisible by tp_size {tp_size}. "
+                f"The last partition will have {vocab_size - st_idx} embeddings."
+            )
+            ed_idx = vocab_size
         return st_idx, ed_idx
 
     def forward(self, x: torch.Tensor):
