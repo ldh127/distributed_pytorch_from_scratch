@@ -150,6 +150,8 @@ class Transformer(nn.Module):
 
     def forward(self, input_ids: torch.Tensor, position_ids: torch.Tensor) -> torch.Tensor:
         x = self.embedding(input_ids)
+        if os.environ.get('DTYPE', "bfloat16") == "bfloat16":
+            x = x.to(torch.bfloat16)
         for layer in self.layers:
             x = layer(x, position_ids)
         logits = self.lm_head(self.norm(x))
