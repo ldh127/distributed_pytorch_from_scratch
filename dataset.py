@@ -1,10 +1,11 @@
 import os
 import json
 from functools import partial
+from typing import List
 
 import torch
 from torch.utils.data import Dataset, DataLoader
-from transformers import PreTrainedTokenizerFast
+from tokenizers import Tokenizer
 
 from constants import BOS_TOKEN, EOS_TOKEN, UNK_TOKEN
 
@@ -19,21 +20,21 @@ class ShakespeareDataset(Dataset):
                 raise ValueError(f"Split {split} not found in data file {data_path}. Available splits: {data.keys()}")
             self.data = data[split]
         self.maxlen = maxlen
-        self.tokenizer = PreTrainedTokenizerFast(tokenizer_file=tokenizer_path)
-        self.tokenizer.bos_token = BOS_TOKEN
-        self.tokenizer.eos_token = EOS_TOKEN
-        self.tokenizer.unk_token = UNK_TOKEN
-        self.bos = self.tokenizer.bos_token_id
-        self.eos = self.tokenizer.eos_token_id
-        self.unk = self.tokenizer.unk_token_id
-        self.vocab_size = len(self.tokenizer)
+        
+        self.tokenizer = Tokenizer.from_file(tokenizer_path)
+        assert self.tokenizer.add_special_tokens([BOS_TOKEN, EOS_TOKEN, UNK_TOKEN]) == 0, "Some special tokens are not added"
+        self.bos = self.tokenizer.token_to_id(BOS_TOKEN)
+        self.eos = self.tokenizer.token_to_id(EOS_TOKEN)
+        self.unk = self.tokenizer.token_to_id(UNK_TOKEN)
+        self.vocab_size = self.tokenizer.get_vocab_size()
+        
         self.split = split
 
     def __len__(self):
         return len(self.data)
 
-    def __getitem__(self, idx):
-        tokens = self.tokenizer(self.data[idx], return_tensors='pt')['input_ids'][0]
+    def __getitem__(self, idx) -> List[int]:
+        tokens = self.tokenizer.encode(self.data[idx]).ids
         if len(tokens) > self.maxlen:
             print(f"Warning: sequence {idx} is longer than maxlen {self.maxlen}. Truncating...")
         tokens = tokens[:self.maxlen]       # clip to maxlen
