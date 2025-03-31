@@ -1,3 +1,4 @@
 BOS_TOKEN = "<BOS>"
 EOS_TOKEN = "<EOS>"
 UNK_TOKEN = "<UNK>"
+IGNORE_INDEX = -1
