@@ -6,6 +6,7 @@ from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.pre_tokenizers import Whitespace
 from tokenizers.trainers import BpeTrainer
+from tokenizers.decoders import ByteLevel
 
 from constants import BOS_TOKEN, EOS_TOKEN, UNK_TOKEN
 
@@ -32,6 +33,7 @@ if __name__ == "__main__":
     special_tokens = [BOS_TOKEN, EOS_TOKEN, UNK_TOKEN]
     tokenizer = Tokenizer(BPE(unk_token=UNK_TOKEN))
     tokenizer.pre_tokenizer = Whitespace()
+    tokenizer.decoder = ByteLevel()
     
     trainer = BpeTrainer(
         vocab_size=args.vocab_size,
