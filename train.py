@@ -1,13 +1,11 @@
 import os
 import glob
 import re
-import random
 import math
-from dataclasses import dataclass, asdict
+from dataclasses import asdict
 from argparse import ArgumentParser, Namespace
 
 import tqdm
-import numpy as np
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -20,6 +18,7 @@ from dataset import get_dataloader
 from constants import IGNORE_INDEX
 from constants import ModelArgumments
 import process_manager as pm
+from utils import set_seed, init_dist_env
 
 
 def get_train_args():
@@ -49,21 +48,6 @@ def get_train_args():
     group.add_argument('--use_vallina_impl', action='store_true', help="Whether to use vanilla implementation of transformer or not.")
 
     return parser.parse_args()
-
-
-def set_seed(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-
-
-def init_dist_env(args: Namespace, rank: int):
-    os.environ['MASTER_ADDR'] = args.master_addr
-    os.environ['MASTER_PORT'] = args.master_port
-    torch.cuda.set_device(rank)
-    dist.init_process_group(backend='nccl', init_method='env://', world_size=args.tp_size, rank=rank)
-    pm.init_pgm(args.tp_size)
 
 
 
