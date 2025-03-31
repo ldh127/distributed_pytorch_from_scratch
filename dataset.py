@@ -41,7 +41,8 @@ class ShakespeareDataset(Dataset):
         return tokens     # (seq_len,)
 
 
-def collate_fn(batch, bos: int, eos: int, ignore_idx: int):
+def collate_fn(batch: List[List[int]], bos: int, eos: int, ignore_idx: int):
+    batch = [torch.tensor(x) for x in batch]
     max_len = max(len(x) for x in batch)
     input_ids = torch.full((len(batch), max_len + 1), fill_value=eos, dtype=torch.long)
     target_ids = torch.full((len(batch), max_len + 1), fill_value=ignore_idx, dtype=torch.long)
