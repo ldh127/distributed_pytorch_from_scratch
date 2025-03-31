@@ -192,8 +192,7 @@ class VallinaTransformer(Transformer):
     
     def _init_linear(self, module: nn.Linear):
         weight, bias = module.weight, module.bias
-        bound = math.sqrt(2. / weight.size(1))
-        nn.init.normal_(weight, -bound, bound)
+        nn.init.kaiming_uniform_(weight, a=math.sqrt(5))
         if bias is not None:
             nn.init.zeros_(bias)
     
