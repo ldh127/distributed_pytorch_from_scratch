@@ -67,6 +67,11 @@ def train(rank: int, args: Namespace):
     model.cuda()
     model.reset_parameters()        # re-initialize parameters (neccassary for tensor-parallel Transformer)
     model.train()
+
+    if pm.pgm.tp_rank == 0:
+        print(model)
+        num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print(f"Number of parameters: {num_param / 1e6:.4f} million")
     
     dataloader = get_dataloader(
         args.data_path, args.tokenizer_path, 
