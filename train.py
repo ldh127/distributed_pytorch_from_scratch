@@ -11,6 +11,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.optim as optim
 import torch.nn.functional as F
+from torch.cuda.amp import GradScaler, autocast
 from tensorboardX import SummaryWriter
 
 from models.model import Transformer, VallinaTransformer
@@ -38,6 +39,7 @@ def get_train_args():
     group.add_argument("--save_dir", type=str, default='./checkpoints')
     group.add_argument("--reserv_last_n_ckpts", type=int, default=5)
     group.add_argument("--batch_size", "-b", type=int, default=64)
+    group.add_argument("--bf16", action='store_true', help="Whether to use automatic mixed precision or not.")
 
     group = parser.add_argument_group("data")
     group.add_argument("--data_path", "-d", type=str, required=True)
@@ -47,13 +49,17 @@ def get_train_args():
     group.add_argument('--random_seed', type=int, default=0)
     group.add_argument('--use_vallina_impl', action='store_true', help="Whether to use vanilla implementation of transformer or not.")
 
-    return parser.parse_args()
-
+    args = parser.parse_args()
+    return args
 
 
 def train(rank: int, args: Namespace):
     set_seed(args.random_seed)
     init_dist_env(args, rank)
+    if args.bf16:
+        os.environ['DTYPE'] = 'bfloat16'
+    else:
+        os.environ['DTYPE'] = 'float32'
     
     model_cls = VallinaTransformer if args.use_vallina_impl else Transformer
     model_args = ModelArgumments()
@@ -71,6 +77,7 @@ def train(rank: int, args: Namespace):
     dist.barrier()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.OneCycleLR(optimizer, args.lr, args.max_steps, pct_start=args.warmup_steps / args.max_steps)
+    scaler = GradScaler() if args.bf16 else None
     summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, f"tprank-{rank}"))
 
     tag = f"TP-{pm.pgm.tp_rank}" if not args.use_vallina_impl else "vanilla"
@@ -79,21 +86,28 @@ def train(rank: int, args: Namespace):
     max_epoch = math.ceil(args.max_steps / len(dataloader))
     
     dist.barrier()
+    dtype = torch.bfloat16 if args.bf16 else torch.float32
     for epoch in range(max_epoch):
         for i, batch in enumerate(dataloader):
-            input_ids = batch['input_ids'].cuda()
-            target_ids = batch['target_ids'].cuda()
-            position_ids = batch['position_ids'].cuda()
-            logits = model(input_ids, position_ids)
-            loss = F.cross_entropy(
-                logits.view(-1, logits.size(-1)), target_ids.view(-1), 
-                ignore_index=IGNORE_INDEX, reduction='mean',
-            )
-            
+            input_ids = batch['input_ids'].long().cuda()
+            target_ids = batch['target_ids'].long().cuda()
+            position_ids = batch['position_ids'].long().cuda()
+            with autocast(enabled=args.bf16, dtype=dtype):
+                logits = model(input_ids, position_ids)
+                loss = F.cross_entropy(
+                    logits.view(-1, logits.size(-1)), target_ids.view(-1), 
+                    ignore_index=IGNORE_INDEX, reduction='mean',
+                )
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            if args.bf16:
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                loss.backward()
+                optimizer.step()
             scheduler.step()
+            
             accum_loss += loss.item()
             pbar.update(1)
             pbar.set_postfix({'avg_loss': accum_loss / pbar.n})
