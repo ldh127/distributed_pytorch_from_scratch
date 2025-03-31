@@ -30,14 +30,14 @@ class RowParallelLinear(nn.Module):
         else:
             self.register_parameter("bias", None)
 
+    @torch.no_grad()
     def reset_parameters(self):
         weight = torch.empty(self.odim, self.idim, dtype=self.weight.dtype, device=self.weight.device, requires_grad=False)
         nn.init.kaiming_uniform_(weight, a=math.sqrt(5))    # the same as pytorch default
         if pm.pgm.tp_size > 1:
             dist.broadcast(weight, src=0)       # broadcast weight to all processes to ensure weight consistency
             weight = torch.split(weight, self.idim_partition, dim=-1)[pm.pgm.tp_rank]   # (odim, idim) -> [(odim, idim/n), ...]
-        with torch.no_grad():
-            self.weight.copy_(weight.contiguous())
+        self.weight.copy_(weight.contiguous())
         if self.add_bias:
             nn.init.zeros_(self.bias)
 
@@ -75,14 +75,14 @@ class ColumnParallelLinear(nn.Module):
         else:
             self.register_parameter("bias", None)
 
+    @torch.no_grad()
     def reset_parameters(self):
         weight = torch.empty(self.odim, self.idim, dtype=self.weight.dtype, device=self.weight.device, requires_grad=False)
         nn.init.kaiming_uniform_(weight, a=math.sqrt(5))    # the same as pytorch default
         if pm.pgm.tp_size > 1:
             dist.broadcast(weight, src=0)       # broadcast weight to all processes to ensure weight consistency
             weight = torch.split(weight, self.odim_partition, dim=0)[pm.pgm.tp_rank]   # (odim, idim) -> [(odim/n, idim), ...]
-        with torch.no_grad():
-            self.weight.copy_(weight.contiguous())
+        self.weight.copy_(weight.contiguous())
         if self.add_bias:
             nn.init.zeros_(self.bias)
 
@@ -108,14 +108,14 @@ class ParallelVocabularyEmbedding(nn.Module):
         self.vocab_st_idx, self.vocab_ed_idx = self._get_vocab_range(vocab_size)
         self.weight = nn.Parameter(torch.Tensor(self.vocab_ed_idx - self.vocab_st_idx, self.hdim))
 
+    @torch.no_grad()
     def reset_parameters(self):
         weight = torch.empty(self.vocab_size, self.hdim, device=self.weight.device, dtype=self.weight.dtype, requires_grad=False)
         nn.init.normal_(weight, mean=0., std=1.)    # the same as pytorch default
         if pm.pgm.tp_size > 1:
             dist.broadcast(weight, src=0)
             weight = torch.split(weight, self.vocab_size // pm.pgm.tp_size)[pm.pgm.tp_rank]
-        with torch.no_grad():
-            self.weight.copy_(weight.contiguous())
+        self.weight.copy_(weight.contiguous())
 
     def _get_vocab_range(self, vocab_size: int) -> Tuple[int, int]:
         tp_size, tp_rank = pm.pgm.tp_size, pm.pgm.tp_rank
