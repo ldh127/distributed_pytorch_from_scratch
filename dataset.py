@@ -11,10 +11,13 @@ from constants import BOS_TOKEN, EOS_TOKEN, UNK_TOKEN
 
 class ShakespeareDataset(Dataset):
     def __init__(self, data_path: str, tokenizer_path: str, split: str, maxlen):
-        assert split in ["train", "val"], f"Expectected split to be 'train' or 'val', but got {split}"
+        assert split in ["train", "validation"], f"Expectected split to be 'train' or 'validation', but got {split}"
         assert os.path.exists(data_path) and os.path.exists(tokenizer_path)
         with open(data_path, 'r') as f:
-            self.data = json.load(f)[split]
+            data = json.load(f)
+            if split not in data:
+                raise ValueError(f"Split {split} not found in data file {data_path}. Available splits: {data.keys()}")
+            self.data = data[split]
         self.maxlen = maxlen
         self.tokenizer = PreTrainedTokenizerFast(tokenizer_file=tokenizer_path)
         self.tokenizer.bos_token = BOS_TOKEN
@@ -31,6 +34,8 @@ class ShakespeareDataset(Dataset):
 
     def __getitem__(self, idx):
         tokens = self.tokenizer(self.data[idx], return_tensors='pt')['input_ids'][0]
+        if len(tokens) > self.maxlen:
+            print(f"Warning: sequence {idx} is longer than maxlen {self.maxlen}. Truncating...")
         tokens = tokens[:self.maxlen]       # clip to maxlen
         return tokens     # (seq_len,)
 
