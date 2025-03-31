@@ -105,13 +105,7 @@ def train(rank: int, args: Namespace):
                 logits.view(-1, logits.size(-1)), target_ids.view(-1), 
                 ignore_index=IGNORE_INDEX, reduction='mean',
             )
-
-            # debug
-            if loss > 10 and pm.pgm.tp_rank == 0:
-                print(f"[TP Rank: {pm.pgm.tp_rank}]: loss spike: {loss.item()}")
             
-            dist.barrier()
-
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
