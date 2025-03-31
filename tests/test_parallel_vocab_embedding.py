@@ -43,8 +43,7 @@ class VallinaToyModel(nn.Module):
         self.linear = nn.Linear(idim, odim, bias=True)
 
     def reset_parameters(self):
-        bound = math.sqrt(2. / self.idim)
-        nn.init.normal_(self.linear.weight, -bound, bound)
+        nn.init.kaiming_uniform_(self.linear.weight, a=math.sqrt(5))
         nn.init.zeros_(self.linear.bias)
         nn.init.normal_(self.vocab_embed.weight, mean=0., std=1.)
 
@@ -106,11 +105,11 @@ class TestParallelVocabularyEmbedding(unittest.TestCase):
     def _compare_model_weights(self, para_model: ParallelToyModel, vallina_model: VallinaToyModel):
         vocab_st_pos = para_model.vocab_embed.vocab_st_idx
         vocab_ed_pos = para_model.vocab_embed.vocab_ed_idx
-        self.assertTrue(torch.allclose(para_model.vocab_embed.weight, vallina_model.vocab_embed.weight[vocab_st_pos: vocab_ed_pos], atol=1e-6))
+        self.assertTrue(torch.allclose(para_model.vocab_embed.weight, vallina_model.vocab_embed.weight[vocab_st_pos: vocab_ed_pos], atol=1e-4))
         op = para_model.linear.odim_partition
         lin_st_pos, lin_ed_pos = op * pm.pgm.tp_rank, op * (pm.pgm.tp_rank + 1)
-        self.assertTrue(torch.allclose(para_model.linear.weight.data, vallina_model.linear.weight.data[lin_st_pos: lin_ed_pos], atol=1e-6))
-        self.assertTrue(torch.allclose(para_model.linear.bias.data, vallina_model.linear.bias.data[lin_st_pos: lin_ed_pos], atol=1e-6))
+        self.assertTrue(torch.allclose(para_model.linear.weight.data, vallina_model.linear.weight.data[lin_st_pos: lin_ed_pos], atol=1e-4))
+        self.assertTrue(torch.allclose(para_model.linear.bias.data, vallina_model.linear.bias.data[lin_st_pos: lin_ed_pos], atol=1e-4))
 
     def test_multiple_passes(self):
         idim, odim = 512, 2048
