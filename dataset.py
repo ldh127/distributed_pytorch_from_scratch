@@ -27,7 +27,7 @@ class ShakespeareDataset(Dataset):
         
 
     def __len__(self):
-        return len(self.data)
+        return len(self.data[self.split])
 
     def __getitem__(self, idx) -> List[int]:
         tokens = self.data[self.split][idx]
