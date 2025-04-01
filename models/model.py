@@ -1,7 +1,6 @@
 import os
 import math
 from typing import Tuple
-from enum import Enum
 
 import einops
 import torch
@@ -37,7 +36,7 @@ def get_cos_sin(seq_length: int, head_dim: int, base: float) -> Tuple[torch.Tens
     assert head_dim % 2 == 0
     # Results on CUDA and CPU are different even with the same formula, To match transformers implementation. frequency should be computed on CPU
     theta = 1.0 / (base ** (torch.arange(0, head_dim, 2, dtype=torch.int64).float().to('cpu') / head_dim))
-    dtype = torch.bfloat16 if os.getenv('DTYPE', 'bfloat16') == 'bfloat16' else torch.float32
+    dtype = torch.bfloat16 if os.getenv('DTYPE', 'float32') == 'bfloat16' else torch.float32
     device = torch.device('cuda') if os.getenv('DEVICE', 'cuda') == 'cuda' else torch.device('cpu')
     position = torch.arange(seq_length).to(device).unsqueeze(1).float()     # [seq_length, 1]
     # To match transformers implementation. m * theta should be computed on GPU
@@ -150,8 +149,8 @@ class Transformer(nn.Module):
 
     def forward(self, input_ids: torch.Tensor, position_ids: torch.Tensor) -> torch.Tensor:
         x = self.embedding(input_ids)
-        if os.environ.get('DTYPE', "bfloat16") == "bfloat16":
-            x = x.to(torch.bfloat16)
+        dtype = torch.bfloat16 if os.environ.get('DTYPE', 'float32') == 'bfloat16' else torch.float32
+        x = x.to(dtype)
         for layer in self.layers:
             x = layer(x, position_ids)
         logits = self.lm_head(self.norm(x))
