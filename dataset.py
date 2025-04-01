@@ -67,6 +67,6 @@ def get_dataloader(
     dataset = ShakespeareDataset(data_path, tokenizer_path, split, maxlen=maxlen)
     collate_fn_partial = partial(collate_fn, bos=dataset.bos, eos=dataset.eos, ignore_idx=ignore_idx)
     dataloader = DataLoader(
-        dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn_partial, num_workers=4
+        dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn_partial, num_workers=0
     )
     return dataloader
