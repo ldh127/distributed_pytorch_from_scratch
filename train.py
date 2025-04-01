@@ -102,9 +102,9 @@ def train(rank: int, args: Namespace):
 
     for epoch in range(max_epoch):
         for i, batch in enumerate(dataloader):
-            input_ids = batch['input_ids'].long().cuda()
-            target_ids = batch['target_ids'].long().cuda()
-            position_ids = batch['position_ids'].long().cuda()
+            input_ids = batch['input_ids'].cuda()
+            target_ids = batch['target_ids'].cuda()
+            position_ids = batch['position_ids'].cuda()
             with autocast(enabled=args.bf16, dtype=dtype):
                 logits = model(input_ids, position_ids)
                 loss = F.cross_entropy(
