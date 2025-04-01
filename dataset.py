@@ -45,7 +45,7 @@ def collate_fn(batch: List[List[int]], bos: int, eos: int, ignore_idx: int):
         input_ids[i, 1: len(b) + 1] = torch.tensor(b, dtype=torch.long)
         target_ids[i, :len(b)] = torch.tensor(b, dtype=torch.long)
         target_ids[i, len(b)] = eos
-    position_ids = torch.arange(max_len + 1, device=input_ids.device).unsqueeze(0).expand(len(batch), -1).clone()   # clone: to avoid overlapping memory
+    position_ids = torch.arange(max_len + 1, device=input_ids.device).unsqueeze(0).repeat(len(batch), 1)
     
     return {
         'input_ids': input_ids,
