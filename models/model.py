@@ -114,7 +114,8 @@ class DecoderLayer(nn.Module):
         self.ffn.reset_parameters()
 
     def forward(self, x: torch.Tensor, position_ids: torch.Tensor) -> torch.Tensor:
-        cos, sin = self.cos[position_ids], self.sin[position_ids]       # (bs, seq_len, head_dim)   
+        with torch.no_grad():
+            cos, sin = self.cos[position_ids], self.sin[position_ids]         # (bs, seq_len, head_dim)   
         x = x + self.attn(self.norm1(x), cos, sin)
         x = x + self.ffn(self.norm2(x))
         return x
