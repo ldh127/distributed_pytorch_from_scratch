@@ -73,7 +73,7 @@ def train(rank: int, args: Namespace):
         print(f"Number of parameters: {num_param / 1e6:.4f} million")
     
     dataloader = get_dataloader(
-        args.data_path, args.tokenizer_path, 
+        args.data_path,
         args.batch_size, IGNORE_INDEX, split='train', maxlen=model_args.maxlen, shuffle=True,
     )
     assert dataloader.dataset.vocab_size == model_args.vocab_size, "vocab size of dataset and model should be the same"
