@@ -8,11 +8,12 @@ import tqdm
 import torch
 import torch.multiprocessing as mp
 import torch.nn.functional as F
+from tokenizers import Tokenizer
 
 import process_manager as pm
 from models.model import Transformer, VallinaTransformer
 from dataset import get_dataloader
-from constants import IGNORE_INDEX
+from constants import IGNORE_INDEX, BOS_TOKEN, EOS_TOKEN
 from constants import ModelArgumments
 from utils import init_dist_env, set_seed
 
@@ -62,7 +63,7 @@ def test(rank, args):
 
     batch_size = 1
     dataloader = get_dataloader(
-        args.data_path, args.tokenizer_path, batch_size, IGNORE_INDEX, 
+        args.data_path, batch_size, IGNORE_INDEX, 
         split='validation', maxlen=model_args.maxlen, shuffle=False,
     )
 
@@ -94,19 +95,23 @@ def test(rank, args):
 
     # continue writing (greedy decoding)
     texts = [
-        "Nice to meet you, ",
-        "Great empire never falls, ",
+        "Nice to meet you, it's",
+        "Great empire never falls, it only",
         "Your majesty, it's my duty ",
         "I shall be glad ",
-        "What a glory to "
+        "What a glory to ",
+        "Shame for the weak, it's",
+        "The brave man ne",
+        "Poor old man, it's"
     ]
     decoded = []
-    tokenizer = dataloader.dataset.tokenizer
+    tokenizer = Tokenizer.from_file(args.tokenizer_path)
     bos_id = dataloader.dataset.bos
     eos_id = dataloader.dataset.eos
+    assert tokenizer.token_to_id(BOS_TOKEN) == bos_id and tokenizer.token_to_id(EOS_TOKEN) == eos_id
     for t in texts:
         t = t.strip()
-        tokens = tokenizer(t, return_tensors='pt')['input_ids'].cuda()    # (1, seq_len)
+        tokens = torch.tensor(tokenizer.encode(t).ids, dtype=torch.long).cuda().view(1, -1)   # (1, seq_len)
         tokens = F.pad(tokens, (1, 0), mode="constant", value=bos_id)
         while True:
             position_ids = torch.arange(tokens.size(-1), dtype=torch.long, device=tokens.device).unsqueeze(0)    # (1, seq_len)
@@ -115,13 +120,14 @@ def test(rank, args):
             pred_token = logits.argmax(dim=-1).item()
             tokens = F.pad(tokens, (0, 1), mode="constant", value=pred_token)   # (1, seq_len + 1)
             if tokens[0, -1].item() == eos_id:
-                trans = tokenizer.decode(tokens[0, 1:-1].tolist(), clean_up_tokenization_spaces=True).strip()
+                trans = tokenizer.decode(tokens[0, 1: -1].tolist()).strip()
                 assert t in trans, f"Prediction {trans} does not contain the input text {t}"
                 decoded.append((t, trans[len(t):]))
                 break
     
     if pm.pgm.tp_rank == 0:
         with open(save_path, 'a') as fp:
+            print(f"Input texts -> Decoded texts", file=fp)
             for input_text, decoded_text in decoded:
                 print(f"{input_text} -> {decoded_text}")
                 print(f"{input_text} -> {decoded_text}", file=fp)
