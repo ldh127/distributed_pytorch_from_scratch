@@ -37,7 +37,7 @@ class ShakespeareDataset(Dataset):
         tokens = self.tokenizer.encode(self.data[idx]).ids
         if len(tokens) > self.maxlen:
             print(f"Warning: sequence {idx} is longer than maxlen {self.maxlen}. Truncating...")
-        tokens = tokens[:self.maxlen]       # clip to maxlen
+            tokens = tokens[:self.maxlen]       # clip to maxlen
         return tokens     # (seq_len,)
 
 
