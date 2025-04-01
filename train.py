@@ -104,6 +104,7 @@ def train(rank: int, args: Namespace):
                     logits.view(-1, logits.size(-1)), target_ids.view(-1), 
                     ignore_index=IGNORE_INDEX, reduction='mean',
                 )
+            del batch, input_ids, target_ids, position_ids, logits
             optimizer.zero_grad()
             if args.bf16:
                 scaler.scale(loss).backward()
