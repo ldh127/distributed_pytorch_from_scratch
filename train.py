@@ -43,7 +43,6 @@ def get_train_args():
 
     group = parser.add_argument_group("data")
     group.add_argument("--data_path", "-d", type=str, required=True)
-    group.add_argument("--tokenizer_path", "-t", type=str, required=True)
     
     group = parser.add_argument_group("other")
     group.add_argument('--random_seed', type=int, default=0)
