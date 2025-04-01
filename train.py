@@ -149,4 +149,5 @@ def train(rank: int, args: Namespace):
 
 if __name__ == '__main__':
     args = get_train_args()
-    mp.spawn(train, args=(args, ), nprocs=args.tp_size, join=True)
+    rank = int(os.environ["LOCAL_RANK"])
+    train(rank, args)
