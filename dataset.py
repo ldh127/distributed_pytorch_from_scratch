@@ -25,7 +25,6 @@ class ShakespeareDataset(Dataset):
         self.unk = self.data["special_ids"][UNK_TOKEN]
         self.vocab_size = self.data["vocab_size"]
         
-
     def __len__(self):
         return len(self.data[self.split])
 
@@ -38,16 +37,15 @@ class ShakespeareDataset(Dataset):
 
 
 def collate_fn(batch: List[List[int]], bos: int, eos: int, ignore_idx: int):
-    batch = [torch.tensor(x) for x in batch]
     max_len = max(len(x) for x in batch)
     input_ids = torch.full((len(batch), max_len + 1), fill_value=eos, dtype=torch.long)
     target_ids = torch.full((len(batch), max_len + 1), fill_value=ignore_idx, dtype=torch.long)
     for i, b in enumerate(batch):
         input_ids[i, 0] = bos
-        input_ids[i, 1: len(b) + 1] = b
-        target_ids[i, :len(b)] = b
+        input_ids[i, 1: len(b) + 1] = torch.tensor(b, dtype=torch.long)
+        target_ids[i, :len(b)] = torch.tensor(b, dtype=torch.long)
         target_ids[i, len(b)] = eos
-    position_ids = torch.arange(max_len + 1, device=batch[0].device).unsqueeze(0).expand(len(batch), -1)
+    position_ids = torch.arange(max_len + 1, device=input_ids.device).unsqueeze(0).expand(len(batch), -1).clone()   # clone: to avoid overlapping memory
     
     return {
         'input_ids': input_ids,
@@ -63,6 +61,7 @@ def get_dataloader(
     dataset = ShakespeareDataset(data_path, split, maxlen=maxlen)
     collate_fn_partial = partial(collate_fn, bos=dataset.bos, eos=dataset.eos, ignore_idx=ignore_idx)
     dataloader = DataLoader(
-        dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn_partial, num_workers=0
+        dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn_partial, 
+        num_workers=0, pin_memory=True
     )
     return dataloader
