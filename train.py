@@ -56,8 +56,10 @@ def train(rank: int, args: Namespace):
     set_seed(args.random_seed)
     init_dist_env(args, rank)
     if args.bf16:
+        print("Enable bf16 training")
         os.environ['DTYPE'] = 'bfloat16'
     else:
+        print("Disable bf16 training")
         os.environ['DTYPE'] = 'float32'
     
     model_cls = VallinaTransformer if args.use_vallina_impl else Transformer
@@ -135,6 +137,8 @@ def train(rank: int, args: Namespace):
                 dist.barrier()
             if pbar.n >= args.max_steps:
                 break
+        if pm.pgm.tp_rank == 0:
+            print(f"Epoch {epoch + 1}/{max_epoch} finished.")
         if pbar.n >= args.max_steps:
             print(f"[TP rank {rank}]: Training finished (total steps: {pbar.n}). Exiting...")
             break
