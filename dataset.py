@@ -5,38 +5,34 @@ from typing import List
 
 import torch
 from torch.utils.data import Dataset, DataLoader
-from tokenizers import Tokenizer
 
 from constants import BOS_TOKEN, EOS_TOKEN, UNK_TOKEN
 
 
 class ShakespeareDataset(Dataset):
-    def __init__(self, data_path: str, tokenizer_path: str, split: str, maxlen):
+    def __init__(self, data_path: str, split: str, maxlen):
         assert split in ["train", "validation"], f"Expectected split to be 'train' or 'validation', but got {split}"
-        assert os.path.exists(data_path) and os.path.exists(tokenizer_path)
+        assert os.path.exists(data_path)
         with open(data_path, 'r') as f:
-            data = json.load(f)
-            if split not in data:
-                raise ValueError(f"Split {split} not found in data file {data_path}. Available splits: {data.keys()}")
-            self.data = data[split]
+            self.data = json.load(f)
+            if split not in self.data:
+                raise ValueError(f"Split {split} not found in data file {data_path}. Available splits: {self.data.keys()}")
         self.maxlen = maxlen
-        
-        self.tokenizer = Tokenizer.from_file(tokenizer_path)
-        assert self.tokenizer.add_special_tokens([BOS_TOKEN, EOS_TOKEN, UNK_TOKEN]) == 0, "Some special tokens are not added"
-        self.bos = self.tokenizer.token_to_id(BOS_TOKEN)
-        self.eos = self.tokenizer.token_to_id(EOS_TOKEN)
-        self.unk = self.tokenizer.token_to_id(UNK_TOKEN)
-        self.vocab_size = self.tokenizer.get_vocab_size()
-        
         self.split = split
+        
+        self.bos = self.data["special_ids"][BOS_TOKEN]
+        self.eos = self.data["special_ids"][EOS_TOKEN]
+        self.unk = self.data["special_ids"][UNK_TOKEN]
+        self.vocab_size = self.data["vocab_size"]
+        
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx) -> List[int]:
-        tokens = self.tokenizer.encode(self.data[idx]).ids
+        tokens = self.data[self.split][idx]
         if len(tokens) > self.maxlen:
-            print(f"Warning: sequence {idx} is longer than maxlen {self.maxlen}. Truncating...")
+            print(f"Warning: sequence is longer than maxlen {self.maxlen}. Truncating: {tokens} -> {self.data[idx]}")
             tokens = tokens[:self.maxlen]       # clip to maxlen
         return tokens     # (seq_len,)
 
@@ -61,10 +57,10 @@ def collate_fn(batch: List[List[int]], bos: int, eos: int, ignore_idx: int):
 
 
 def get_dataloader(
-    data_path: str, tokenizer_path: str, 
+    data_path: str, 
     batch_size: int, ignore_idx: int, split: str, maxlen: int, shuffle: bool = True
 ):
-    dataset = ShakespeareDataset(data_path, tokenizer_path, split, maxlen=maxlen)
+    dataset = ShakespeareDataset(data_path, split, maxlen=maxlen)
     collate_fn_partial = partial(collate_fn, bos=dataset.bos, eos=dataset.eos, ignore_idx=ignore_idx)
     dataloader = DataLoader(
         dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn_partial, num_workers=0
