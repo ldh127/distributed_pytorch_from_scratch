@@ -135,8 +135,10 @@ def train(rank: int, args: Namespace):
                         os.remove(ckpt)
                 dist.barrier()
             if pbar.n >= args.max_steps:
-                print(f"[TP rank {rank}]: Training finished (total steps: {pbar.n}). Exiting...")
                 break
+        if pbar.n >= args.max_steps:
+            print(f"[TP rank {rank}]: Training finished (total steps: {pbar.n}). Exiting...")
+            break
         torch.cuda.empty_cache()
 
     pbar.close()
