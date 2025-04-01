@@ -170,10 +170,12 @@ class VallinaTransformer(Transformer):
         self.lm_head = nn.Linear(attn_dim, vocab_size)
         for layer in self.layers:
             layer.attn.num_local_heads = layer.attn.num_heads
+            del layer.attn.wq, layer.attn.wk, layer.attn.wv, layer.attn.wo
             layer.attn.wq = nn.Linear(attn_dim, attn_dim)
             layer.attn.wk = nn.Linear(attn_dim, attn_dim)
             layer.attn.wv = nn.Linear(attn_dim, attn_dim)
             layer.attn.wo = nn.Linear(attn_dim, attn_dim)
+            del layer.ffn.gate_proj, layer.ffn.up_proj, layer.ffn.down_proj
             layer.ffn.gate_proj = nn.Linear(attn_dim, ffn_dim)
             layer.ffn.up_proj = nn.Linear(attn_dim, ffn_dim)
             layer.ffn.down_proj = nn.Linear(ffn_dim, attn_dim)
