@@ -12,7 +12,6 @@ import torch.multiprocessing as mp
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.cuda.amp import GradScaler, autocast
-from torch.autograd.profiler import record_function
 from tensorboardX import SummaryWriter
 
 from models.model import Transformer, VallinaTransformer
@@ -94,62 +93,33 @@ def train(rank: int, args: Namespace):
     scaler = GradScaler() if args.bf16 else None
     summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, f"tprank-{rank}"))
 
-    # debug
-    args.max_steps = 1000
-    record_every_step = 10
-    print(f"DEBUG: set args.max_steps to {args.max_steps}")
-
     tag = f"TP-{pm.pgm.tp_rank}" if not args.use_vallina_impl else "vanilla"
     pbar = tqdm.tqdm(range(args.max_steps), desc=f"Training-[{tag}]", position=rank)
     accum_loss = 0.
     max_epoch = math.ceil(args.max_steps / len(dataloader))
     dist.barrier()
     dtype = torch.bfloat16 if args.bf16 else torch.float32
-    
-    # debug
-    torch.cuda.memory._record_memory_history()
-    last_iter = 0
 
     for epoch in range(max_epoch):
         for i, batch in enumerate(dataloader):
-            
-            # debug
-            if i % record_every_step == 0 and i > 0:
-                free_mem = get_free_gpu_memory()
-                free_mem_str = f"{free_mem / 1024 ** 3:.2f}GB"
-                bucket_idx = free_mem // (10 * 1024 ** 3)       # each bucket is 10GB
-                bucket_name = f"{bucket_idx}0-{bucket_idx + 1}0GB"
-                file_path = f"./memory_history_span_record/{bucket_name}/tprank-{rank}_iter{last_iter:04d}-{pbar.n:04d}_total{args.max_steps}_freemem_{free_mem_str}.pickle"
-                os.makedirs(os.path.dirname(file_path) or "./", exist_ok=True)
-                torch.cuda.memory._dump_snapshot(file_path)
-                torch.cuda.memory._record_memory_history(enabled=None)
-                if pbar.n != args.max_steps - 1:
-                    torch.cuda.memory._record_memory_history()
-                last_iter = pbar.n
-
             input_ids = batch['input_ids'].long().cuda()
             target_ids = batch['target_ids'].long().cuda()
             position_ids = batch['position_ids'].long().cuda()
             with autocast(enabled=args.bf16, dtype=dtype):
-                with record_function("## forward ##"):
-                    logits = model(input_ids, position_ids)
-                    loss = F.cross_entropy(
-                        logits.view(-1, logits.size(-1)), target_ids.view(-1), 
-                        ignore_index=IGNORE_INDEX, reduction='mean',
-                    )
+                logits = model(input_ids, position_ids)
+                loss = F.cross_entropy(
+                    logits.view(-1, logits.size(-1)), target_ids.view(-1), 
+                    ignore_index=IGNORE_INDEX, reduction='mean',
+                )
             del batch, input_ids, target_ids, position_ids, logits
             optimizer.zero_grad()
             if args.bf16:
-                with record_function("## backward ##"):
-                    scaler.scale(loss).backward()
-                with record_function("## optimizer ##"):
-                    scaler.step(optimizer)
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
                 scaler.update()
             else:
-                with record_function("## backward ##"):
-                    loss.backward()
-                with record_function("## optimizer ##"):
-                    optimizer.step()
+                loss.backward()
+                optimizer.step()
             scheduler.step()
             accum_loss += loss.item()
             pbar.update(1)
