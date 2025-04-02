@@ -15,4 +15,3 @@ class ModelArgumments:
     num_layers: int =  12
     vocab_size: int = 1024
     maxlen: int = 256
-    maxlen: int = 2048
