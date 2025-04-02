@@ -11,7 +11,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.cuda.amp import GradScaler, autocast
+from torch.cuda.amp import autocast
 from tensorboardX import SummaryWriter
 
 from models.model import Transformer, VallinaTransformer
