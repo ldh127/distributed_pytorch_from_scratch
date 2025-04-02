@@ -1,6 +1,5 @@
 import os
 import math
-from typing import Tuple
 
 import einops
 import torch
