@@ -129,6 +129,7 @@ def train(rank: int, args: Namespace):
                     ckpts = glob.glob(os.path.join(args.save_dir, f"tprank-{rank}_iter-*_loss-*.pth"))
                     ckpts = sorted(ckpts, key=lambda x: int(re.findall(r'tprank-\d+_iter-(\d+)_loss-.+.pth', os.path.basename(x))[0]))
                     for ckpt in ckpts[:-args.reserv_last_n_ckpts]:
+                        print(f"[TP rank {rank}]: Remove old checkpoint {ckpt}")
                         os.remove(ckpt)
                 dist.barrier()
             if pbar.n >= args.max_steps:
