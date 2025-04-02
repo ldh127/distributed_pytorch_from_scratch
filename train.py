@@ -113,13 +113,10 @@ def train(rank: int, args: Namespace):
                 )
             del batch, input_ids, target_ids, position_ids, logits
             optimizer.zero_grad()
-            if args.bf16:
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                loss.backward()
-                optimizer.step()
+            loss.backward()
+            optimizer.step()
+            loss.backward()
+            optimizer.step()
             scheduler.step()
             accum_loss += loss.item()
             pbar.update(1)
