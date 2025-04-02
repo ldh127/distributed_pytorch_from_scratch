@@ -12,6 +12,6 @@ class ModelArgumments:
     ffn_dim: int = 2048
     num_heads: int = 8
     rope_theta: float = 10000.
-    num_layers: int =  12
+    num_layers: int = 12
     vocab_size: int = 1024
-    maxlen: int = 2048
+    maxlen: int = 256
