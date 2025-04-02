@@ -31,8 +31,8 @@ class ShakespeareDataset(Dataset):
     def __getitem__(self, idx) -> List[int]:
         tokens = self.data[self.split][idx]
         if len(tokens) > self.maxlen:
-            print(f"Warning: sequence is longer than maxlen {self.maxlen}. Truncating: {tokens} -> {self.data[idx]}")
-            tokens = tokens[:self.maxlen]       # clip to maxlen
+            print(f"Warning: sequence is longer than maxlen {self.maxlen}: {len(tokens)}. Truncating...")
+            tokens = tokens[:self.maxlen - 1]       # clip to maxlen - 1. why -1: reserve one position for EOS/BOS
         return tokens     # (seq_len,)
 
 
