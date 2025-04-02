@@ -83,16 +83,15 @@ def train(rank: int, args: Namespace):
     dist.barrier()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.OneCycleLR(optimizer, args.lr, args.max_steps, pct_start=args.warmup_steps / args.max_steps)
-    scaler = GradScaler() if args.bf16 else None
     summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, f"tprank-{rank}"))
 
     tag = f"TP-{pm.pgm.tp_rank}" if not args.use_vallina_impl else "vanilla"
     pbar = tqdm.tqdm(range(args.max_steps), desc=f"Training-[{tag}]", position=rank)
     accum_loss = 0.
     max_epoch = math.ceil(args.max_steps / len(dataloader))
+
     dist.barrier()
     dtype = torch.bfloat16 if args.bf16 else torch.float32
-
     for epoch in range(max_epoch):
         for i, batch in enumerate(dataloader):
             input_ids = batch['input_ids'].cuda()
@@ -101,13 +100,11 @@ def train(rank: int, args: Namespace):
             with autocast(enabled=args.bf16, dtype=dtype):
                 logits = model(input_ids, position_ids)
                 loss = F.cross_entropy(
-                    logits.view(-1, logits.size(-1)), target_ids.view(-1), 
+                    logits.float().view(-1, logits.size(-1)), target_ids.view(-1), 
                     ignore_index=IGNORE_INDEX, reduction='mean',
                 )
             del batch, input_ids, target_ids, position_ids, logits
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
             loss.backward()
             optimizer.step()
             scheduler.step()
