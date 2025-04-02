@@ -22,13 +22,6 @@ import process_manager as pm
 from utils import set_seed, init_dist_env
 
 
-def get_free_gpu_memory() -> float:
-    gpu_id = torch.cuda.current_device()
-    total_memory = torch.cuda.get_device_properties(gpu_id).total_memory
-    reserved_memory = torch.cuda.memory_reserved(gpu_id)
-    return total_memory - reserved_memory
-
-
 def get_train_args():
     parser = ArgumentParser()
     
