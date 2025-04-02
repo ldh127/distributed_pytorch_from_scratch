@@ -117,6 +117,8 @@ def train(rank: int, args: Namespace):
                 print(f"[TP rank {rank}]: Step {pbar.n}/{args.max_steps} -> Avg Loss {avg_loss:.4f}, Lr {lr:.8f}")
                 summary_writer.add_scalar('train/ce_loss', avg_loss, pbar.n)
                 summary_writer.add_scalar('train/lr', lr, pbar.n)
+                reserved_memory = torch.cuda.memory_reserved(torch.cuda.current_device()) / 1024 ** 3   # in GiB
+                summary_writer.add_scalar(f'GPU/tprank-{rank}', reserved_memory, pbar.n)
             if pbar.n % args.save_interval == 0:
                 avg_loss = accum_loss / pbar.n
                 save_path = os.path.join(args.save_dir, f"tprank-{rank}_iter-{pbar.n}_loss-{avg_loss:.4f}.pth")
