@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from tokenizers import Tokenizer
 
 import process_manager as pm
-from models.model import Transformer, VallinaTransformer
+from models.model import Transformer
 from dataset import get_dataloader
 from constants import IGNORE_INDEX, BOS_TOKEN, EOS_TOKEN
 from constants import ModelArgumments
@@ -45,9 +45,8 @@ def test(rank, args):
     set_seed(args.random_seed)
     init_dist_env(args, rank)
     
-    model_cls = VallinaTransformer if args.use_vallina_impl else Transformer
     model_args = ModelArgumments()
-    model = model_cls(**asdict(model_args))
+    model = Transformer(**asdict(model_args))
     model.cuda()
     model.reset_parameters()        # re-initialize parameters (neccassary for tensor-parallel Transformer)
     model.eval()
@@ -120,7 +119,7 @@ def test(rank, args):
             pred_token = logits.argmax(dim=-1).item()
             tokens = F.pad(tokens, (0, 1), mode="constant", value=pred_token)   # (1, seq_len + 1)
             if tokens[0, -1].item() == eos_id:
-                trans = tokenizer.decode(tokens[0, 1: -1].tolist()).strip()
+                trans = tokenizer.decode(tokens[0, 1: -1].tolist()).strip()     # [1:-1]: remove BOS and EOS
                 assert t in trans, f"Prediction {trans} does not contain the input text {t}"
                 decoded.append((t, trans[len(t):]))
                 break
