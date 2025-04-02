@@ -11,10 +11,10 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.cuda.amp import GradScaler, autocast
+from torch.cuda.amp import autocast
 from tensorboardX import SummaryWriter
 
-from models.model import Transformer, VallinaTransformer
+from models.model import Transformer
 from dataset import get_dataloader
 from constants import IGNORE_INDEX
 from constants import ModelArgumments
@@ -69,9 +69,8 @@ def train(rank: int, args: Namespace):
         print("Disable bf16 training")
         os.environ['DTYPE'] = 'float32'
     
-    model_cls = VallinaTransformer if args.use_vallina_impl else Transformer
     model_args = ModelArgumments()
-    model = model_cls(**asdict(model_args))
+    model = Transformer(**asdict(model_args))
     model.cuda()
     model.reset_parameters()        # re-initialize parameters (neccassary for tensor-parallel Transformer)
     model.train()
@@ -90,7 +89,6 @@ def train(rank: int, args: Namespace):
     dist.barrier()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.OneCycleLR(optimizer, args.lr, args.max_steps, pct_start=args.warmup_steps / args.max_steps)
-    scaler = GradScaler() if args.bf16 else None
     summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, f"tprank-{rank}"))
 
     tag = f"TP-{pm.pgm.tp_rank}" if not args.use_vallina_impl else "vanilla"
@@ -113,13 +111,8 @@ def train(rank: int, args: Namespace):
                 )
             del batch, input_ids, target_ids, position_ids, logits
             optimizer.zero_grad()
-            if args.bf16:
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                loss.backward()
-                optimizer.step()
+            loss.backward()
+            optimizer.step()
             scheduler.step()
             accum_loss += loss.item()
             pbar.update(1)
