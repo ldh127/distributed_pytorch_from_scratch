@@ -151,7 +151,7 @@ class Transformer(nn.Module):
     def forward(self, input_ids: torch.Tensor, position_ids: torch.Tensor) -> torch.Tensor:
         x = self.embedding(input_ids)
         dtype = torch.bfloat16 if os.environ.get('DTYPE', 'float32') == 'bfloat16' else torch.float32
-        x = x.to(dtype)
+        x = x.to(dtype)     # explicitly convert token embedding to bf16 if necessary
         for layer in self.layers:
             x = layer(x, position_ids)
         logits = self.lm_head(self.norm(x))
