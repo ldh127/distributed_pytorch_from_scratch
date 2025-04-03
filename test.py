@@ -60,6 +60,11 @@ def test(rank, args):
     ckpt = torch.load(ckpt_path, map_location='cuda')
     model.load_state_dict(ckpt)
 
+    # use half precision for inference
+    os.environ["DTYPE"] = "bfloat16"
+    dtype = torch.bfloat16
+    model.to(dtype)
+
     batch_size = 1
     dataloader = get_dataloader(
         args.data_path, batch_size, IGNORE_INDEX, 
@@ -73,7 +78,7 @@ def test(rank, args):
         input_ids = batch['input_ids'].cuda()
         target_ids = batch['target_ids'].cuda()
         position_ids = batch['position_ids'].cuda()
-        with torch.inference_mode():
+        with torch.inference_mode(), torch.cuda.amp.autocast(enabled=True, dtype=dtype):
             logits = model(input_ids, position_ids)
         loss = F.cross_entropy(
             logits.view(-1, logits.size(-1)), target_ids.view(-1), 
