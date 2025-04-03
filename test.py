@@ -81,7 +81,7 @@ def test(rank, args):
         with torch.inference_mode(), torch.cuda.amp.autocast(enabled=True, dtype=dtype):
             logits = model(input_ids, position_ids)
         loss = F.cross_entropy(
-            logits.view(-1, logits.size(-1)), target_ids.view(-1), 
+            logits.float().view(-1, logits.size(-1)), target_ids.view(-1), 
             ignore_index=IGNORE_INDEX, reduction='mean',
         )
         accum_loss += loss.item()
@@ -94,8 +94,9 @@ def test(rank, args):
     save_path = os.path.join(args.ckpt_dir, "val", f'tprank-{pm.pgm.tp_rank}_val.txt')
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     if pm.pgm.tp_rank == 0:
-        with open(save_path, 'w') as f:
-            f.write(f"Validation loss: {avg_loss}\n")
+        with open(save_path, 'a') as f:
+            f.write(f"Ckpt -> Validation loss\n")
+            f.write(f"{ckpt_path} -> {avg_loss}\n")
 
     # continue writing (greedy decoding)
     texts = [
@@ -119,7 +120,7 @@ def test(rank, args):
         tokens = F.pad(tokens, (1, 0), mode="constant", value=bos_id)
         while True:
             position_ids = torch.arange(tokens.size(-1), dtype=torch.long, device=tokens.device).unsqueeze(0)    # (1, seq_len)
-            with torch.inference_mode():
+            with torch.inference_mode(), torch.cuda.amp.autocast(enabled=True, dtype=dtype):
                 logits = model(tokens, position_ids)[0, -1]     # (vocab_size,)
             pred_token = logits.argmax(dim=-1).item()
             tokens = F.pad(tokens, (0, 1), mode="constant", value=pred_token)   # (1, seq_len + 1)
