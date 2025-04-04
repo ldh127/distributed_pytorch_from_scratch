@@ -124,8 +124,12 @@ def test(rank, args):
                 logits = model(tokens, position_ids)[0, -1]     # (vocab_size,)
             pred_token = logits.argmax(dim=-1).item()
             tokens = F.pad(tokens, (0, 1), mode="constant", value=pred_token)   # (1, seq_len + 1)
-            if tokens[0, -1].item() == eos_id:
-                trans = tokenizer.decode(tokens[0, 1: -1].tolist()).strip()     # [1:-1]: remove BOS and EOS
+            if tokens[0, -1].item() == eos_id or tokens.size(-1) > model_args.maxlen:
+                if tokens[0, -1] == eos_id:
+                    tokens = tokens[:, :-1]   # remove EOS
+                else:
+                    print(f"[TP Rank {pm.pgm.tp_rank}]: Maximum length reached. Stop decoding.")
+                trans = tokenizer.decode(tokens[0, 1:].tolist()).strip()     # [1:-1]: remove BOS and EOS
                 assert t in trans, f"Prediction {trans} does not contain the input text {t}"
                 decoded.append((t, trans[len(t):]))
                 break
