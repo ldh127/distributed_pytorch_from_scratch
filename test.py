@@ -8,6 +8,7 @@ import tqdm
 import torch
 import torch.multiprocessing as mp
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 from tokenizers import Tokenizer
 
 import process_manager as pm
@@ -42,6 +43,37 @@ def get_test_args():
     
     args = parser.parse_args()
     return args
+
+
+def calc_loss(model: Transformer, ckpt_path: str, dataloader: DataLoader, dtype: torch.dtype) -> float:
+    # load checkpoint
+    model.eval()
+    ckpt = torch.load(ckpt_path, map_location='cuda')
+    for k in ckpt:
+        ckpt[k] = ckpt[k].to(dtype)
+    model.to(dtype)
+    model.load_state_dict(ckpt)
+    
+    # calc validation loss
+    pbar = tqdm.tqdm(range(len(dataloader)), desc=f"[TP Rank {pm.pgm.tp_rank}]: calc validation loss", position=pm.pgm.tp_rank)
+    accum_loss = 0.
+    for batch in dataloader:
+        input_ids = batch['input_ids'].cuda()
+        target_ids = batch['target_ids'].cuda()
+        position_ids = batch['position_ids'].cuda()
+        with torch.inference_mode(), torch.cuda.amp.autocast(enabled=True, dtype=dtype):
+            logits = model(input_ids, position_ids)
+        loss = F.cross_entropy(
+            logits.float().view(-1, logits.size(-1)), target_ids.view(-1), 
+            ignore_index=IGNORE_INDEX, reduction='mean',
+        )
+        accum_loss += loss.item()
+        pbar.update(1)
+        pbar.set_postfix({'avg_loss': accum_loss / pbar.n})
+    pbar.close()
+
+    avg_loss = accum_loss / len(dataloader.dataset)
+    return avg_loss
 
 
 def test(rank, args):
