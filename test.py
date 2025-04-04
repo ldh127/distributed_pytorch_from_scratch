@@ -10,6 +10,7 @@ import torch.multiprocessing as mp
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tokenizers import Tokenizer
+from tensorboardX import SummaryWriter
 
 import process_manager as pm
 from models.model import Transformer
@@ -104,11 +105,16 @@ def test(rank, args):
     )
     save_path = os.path.join(args.ckpt_dir, "val", f'tprank-{pm.pgm.tp_rank}_val.txt')
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    summary_writer = SummaryWriter(log_dir=os.path.join(args.ckpt_dir, f"tprank-{rank}"))
     with open(save_path, 'a') as f:
         f.write(f"Ckpt -> Validation loss\n")
         for ckpt_path in ckpt_paths:
+            # e.g. basename tprank-0_iter-16000_loss-2.7116.pth -> 16000
+            iter_idx = int(re.findall(r"tprank-\d+_iter-(\d+)_loss-.*?.pth", ckpt_path)[0])
+            print(f"[TP Rank {pm.pgm.tp_rank}]: Evaluating iteration {iter_idx}")
             avg_loss = calc_loss(model, ckpt_path, dataloader, dtype)
             f.write(f"{ckpt_path} -> {avg_loss:.4f}\n")
+            summary_writer.add_scalar(f"val/loss", avg_loss, iter_idx)
 
     # continue writing (greedy decoding)
     texts = [
