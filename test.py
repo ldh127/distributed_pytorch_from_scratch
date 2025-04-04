@@ -46,14 +46,18 @@ def get_test_args():
     return args
 
 
-def calc_loss(model: Transformer, ckpt_path: str, dataloader: DataLoader, dtype: torch.dtype) -> float:
-    # load checkpoint
+def load_ckpt(model: Transformer, ckpt_path: str, dtype: torch.dtype):
     model.eval()
     ckpt = torch.load(ckpt_path, map_location='cuda')
     for k in ckpt:
         ckpt[k] = ckpt[k].to(dtype)
     model.to(dtype)
     model.load_state_dict(ckpt)
+
+
+def calc_loss(model: Transformer, ckpt_path: str, dataloader: DataLoader, dtype: torch.dtype) -> float:
+    # load checkpoint
+    load_ckpt(model, ckpt_path, dtype)
     
     # calc validation loss
     pbar = tqdm.tqdm(range(len(dataloader)), desc=f"[TP Rank {pm.pgm.tp_rank}]: calc validation loss", position=pm.pgm.tp_rank)
@@ -116,6 +120,8 @@ def test(rank, args):
             f.write(f"{ckpt_path} -> {avg_loss:.4f}\n")
             summary_writer.add_scalar(f"val/loss", avg_loss, iter_idx)
 
+
+    load_ckpt(model, ckpt_path[-1], dtype)
     # continue writing (greedy decoding)
     texts = [
         "Nice to meet you, it's",
