@@ -8,3 +8,5 @@ log
 logs/
 *.txt
 debug*
+*.json
+*.txt
