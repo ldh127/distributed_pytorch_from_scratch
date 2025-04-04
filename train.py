@@ -37,8 +37,8 @@ def get_train_args():
     group.add_argument("--log_interval", type=int, default=100)
     group.add_argument("--save_interval", type=int, default=1000)
     group.add_argument("--save_dir", type=str, default='./checkpoints')
-    group.add_argument("--reserv_last_n_ckpts", type=int, default=5)
-    group.add_argument("--batch_size", "-b", type=int, default=64)
+    group.add_argument("--reserv_last_n_ckpts", type=int, default=-1)
+    group.add_argument("--batch_size", "-b", type=int, default=32)
     group.add_argument("--bf16", action='store_true', help="Whether to use automatic mixed precision or not.")
 
     group = parser.add_argument_group("data")
