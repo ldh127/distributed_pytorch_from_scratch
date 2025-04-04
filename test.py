@@ -33,6 +33,9 @@ def get_test_args():
     group = parser.add_argument_group("model")
     group.add_argument("--use_vallina_impl", action='store_true')
     parser.add_argument("--ckpt_dir", type=str, required=True)
+    
+    group = parser.add_argument_group("decode")
+    group.add_argument("--max_decode_len", type=int, default=128)
 
     group = parser.add_argument_group("other")
     group.add_argument("--random_seed", type=int, default=0)
@@ -87,6 +90,11 @@ def test(rank, args):
         accum_loss += loss.item()
         pbar.update(1)
         pbar.set_postfix({'avg_loss': accum_loss / pbar.n})
+
+        # debug
+        if pbar.n > 10:
+            break
+
     pbar.close()
 
     avg_loss = accum_loss / len(dataloader.dataset)
@@ -124,7 +132,7 @@ def test(rank, args):
                 logits = model(tokens, position_ids)[0, -1]     # (vocab_size,)
             pred_token = logits.argmax(dim=-1).item()
             tokens = F.pad(tokens, (0, 1), mode="constant", value=pred_token)   # (1, seq_len + 1)
-            if tokens[0, -1].item() == eos_id or tokens.size(-1) > model_args.maxlen:
+            if tokens[0, -1].item() == eos_id or tokens.size(-1) > args.max_decode_len:
                 if tokens[0, -1] == eos_id:
                     tokens = tokens[:, :-1]   # remove EOS
                 else:
