@@ -1,0 +1,12 @@
+*.pyc
+__pycache__
+*cpython*
+*.checkpoints*
+*.pkl
+*.log
+log
+logs/
+*.txt
+debug*
+*.json
+*.txt

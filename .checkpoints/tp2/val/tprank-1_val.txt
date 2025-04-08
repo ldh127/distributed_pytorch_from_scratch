@@ -1,0 +1,21 @@
+Ckpt -> Validation loss
+./.checkpoints/tp2/tprank-1_iter-1000_loss-4.7888.pth -> 3.6821
+./.checkpoints/tp2/tprank-1_iter-2000_loss-4.0767.pth -> 3.1610
+./.checkpoints/tp2/tprank-1_iter-3000_loss-3.7062.pth -> 2.8385
+./.checkpoints/tp2/tprank-1_iter-4000_loss-3.4691.pth -> 2.7163
+./.checkpoints/tp2/tprank-1_iter-5000_loss-3.3082.pth -> 2.6446
+./.checkpoints/tp2/tprank-1_iter-6000_loss-3.1909.pth -> 2.5948
+./.checkpoints/tp2/tprank-1_iter-7000_loss-3.1004.pth -> 2.5512
+./.checkpoints/tp2/tprank-1_iter-8000_loss-3.0271.pth -> 2.5150
+./.checkpoints/tp2/tprank-1_iter-9000_loss-2.9665.pth -> 2.4839
+./.checkpoints/tp2/tprank-1_iter-10000_loss-2.9153.pth -> 2.4558
+./.checkpoints/tp2/tprank-1_iter-11000_loss-2.8704.pth -> 2.4285
+./.checkpoints/tp2/tprank-1_iter-12000_loss-2.8315.pth -> 2.4059
+./.checkpoints/tp2/tprank-1_iter-13000_loss-2.7969.pth -> 2.3852
+./.checkpoints/tp2/tprank-1_iter-14000_loss-2.7659.pth -> 2.3674
+./.checkpoints/tp2/tprank-1_iter-15000_loss-2.7379.pth -> 2.3515
+./.checkpoints/tp2/tprank-1_iter-16000_loss-2.7116.pth -> 2.3399
+./.checkpoints/tp2/tprank-1_iter-17000_loss-2.6865.pth -> 2.3317
+./.checkpoints/tp2/tprank-1_iter-18000_loss-2.6638.pth -> 2.3265
+./.checkpoints/tp2/tprank-1_iter-19000_loss-2.6433.pth -> 2.3239
+./.checkpoints/tp2/tprank-1_iter-20000_loss-2.6249.pth -> 2.3234
