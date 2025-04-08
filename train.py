@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from torch.cuda.amp import autocast
 from tensorboardX import SummaryWriter
 
-from models.model import Transformer, VallinaTransformer
+from models.model import Transformer
 from dataset import get_dataloader
 from constants import IGNORE_INDEX
 from constants import ModelArgumments
@@ -62,9 +62,8 @@ def train(rank: int, args: Namespace):
         print("Disable bf16 training")
         os.environ['DTYPE'] = 'float32'
     
-    model_cls = VallinaTransformer if args.use_vallina_impl else Transformer
     model_args = ModelArgumments()
-    model = model_cls(**asdict(model_args))
+    model = Transformer(**asdict(model_args))
     model.cuda()
     model.reset_parameters()        # re-initialize parameters (neccassary for tensor-parallel Transformer)
     model.train()
