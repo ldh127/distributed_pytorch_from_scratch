@@ -60,7 +60,7 @@ class ColumnParallelLinear(nn.Module):
             self, idim: int, odim: int, add_bias: bool = True,
             gather_output: bool = True
     ):
-        # forward: (b, idim) -[split]> (b, idim/n) -[linear]> (b, odim) -[gather]> (b, odim)
+        # forward: (b, idim) -[linear]> (b, odim/n) -[gather]> (b, odim)
         # weight shape: (idim/n, odim)
         super().__init__()
         self.idim, self.odim = idim, odim

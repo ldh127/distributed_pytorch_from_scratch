@@ -170,6 +170,7 @@ def run_test(rank: int, args: argparse.Namespace):
     runner = unittest.TextTestRunner()
     runner.run(suite)
 
+
 if __name__ == '__main__':
     args = get_args()
     mp.spawn(run_test, args=(args,), nprocs=args.tp_size, join=True)
